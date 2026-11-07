@@ -1,0 +1,709 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>院内薬剤検索</title>
+
+<style>
+:root {
+  --green: #78b8a3;
+  --green-dark: #397f6b;
+  --green-light: #eaf6f0;
+  --blue-light: #edf5fc;
+  --text: #344b48;
+  --muted: #738984;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 20px;
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, "Noto Sans JP",
+    "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+  background: linear-gradient(135deg, #edf7f2, #edf5fc);
+  color: var(--text);
+}
+
+.container {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+header {
+  text-align: center;
+  padding: 18px 10px 24px;
+}
+
+.logo {
+  font-size: 36px;
+  color: var(--green-dark);
+  margin-bottom: 8px;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(22px, 5vw, 30px);
+  color: var(--green-dark);
+  letter-spacing: .04em;
+}
+
+.subtitle {
+  color: var(--muted);
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+.card {
+  background: rgba(255,255,255,.96);
+  border-radius: 22px;
+  padding: clamp(18px, 4vw, 30px);
+  box-shadow: 0 8px 30px rgba(70,120,105,.09);
+  margin-bottom: 18px;
+}
+
+.search-label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.search-wrap { position: relative; }
+
+input[type="search"],
+input[type="text"] {
+  width: 100%;
+  min-width: 0;
+  border: 2px solid #d7e9e1;
+  border-radius: 14px;
+  padding: 15px 16px;
+  font-size: 16px;
+  background: #fbfefd;
+  color: var(--text);
+  outline: none;
+}
+
+input:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(120,184,163,.15);
+}
+
+.suggestions {
+  display: none;
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  background: white;
+  border: 1px solid #d7e9e1;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(50,90,80,.12);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.suggestion {
+  padding: 12px 15px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f5f2;
+}
+
+.suggestion:last-child { border-bottom: none; }
+
+.suggestion:hover,
+.suggestion:focus {
+  background: var(--green-light);
+  outline: none;
+}
+
+.suggestion small {
+  display: block;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+.result {
+  display: none;
+  margin-top: 22px;
+  padding: 22px;
+  border-radius: 16px;
+}
+
+.result.available {
+  background: #e8f6ee;
+  border: 1px solid #b8dfca;
+}
+
+.result.unavailable {
+  background: #fff3e9;
+  border: 1px solid #f0d0b7;
+}
+
+.result h2 {
+  font-size: 20px;
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+
+.drug-name {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.result p {
+  line-height: 1.7;
+  margin: 8px 0;
+}
+
+.notice {
+  margin-top: 14px;
+  font-size: 13px;
+  color: #775b45;
+  line-height: 1.7;
+}
+
+.secondary {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.admin-toggle {
+  display: block;
+  margin: 18px auto 0;
+  background: transparent;
+  border: none;
+  color: #7b9690;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 8px;
+}
+
+.admin { display: none; margin-top: 12px; }
+.admin h2 { font-size: 18px; }
+
+.admin-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+button {
+  border: none;
+  border-radius: 10px;
+  padding: 11px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.primary-button {
+  background: var(--green-dark);
+  color: white;
+}
+
+.delete-button {
+  background: #f8e8e5;
+  color: #a24c40;
+  padding: 7px 10px;
+}
+
+.admin-list {
+  margin-top: 15px;
+  max-height: 280px;
+  overflow-y: auto;
+  font-size: 13px;
+}
+
+.admin-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid #edf1ef;
+}
+
+.admin-item span { overflow-wrap: anywhere; }
+
+footer {
+  text-align: center;
+  color: #8aa19a;
+  font-size: 11px;
+  padding: 10px;
+}
+
+@media (max-width: 520px) {
+  body { padding: 10px; }
+  .card { border-radius: 16px; }
+  .admin-row { grid-template-columns: 1fr; }
+  .admin-row button { width: 100%; }
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<header>
+  <div class="logo">＋</div>
+  <h1>院内薬剤検索</h1>
+  <div class="subtitle">薬剤の処方可否を確認できます</div>
+</header>
+
+<section class="card">
+  <label class="search-label" for="search">
+    薬剤名を入力してください
+  </label>
+
+  <div class="search-wrap">
+    <input
+      type="search"
+      id="search"
+      placeholder="一般名・商品名で検索"
+      autocomplete="off"
+      aria-label="薬剤名検索"
+    >
+    <div class="suggestions" id="suggestions"></div>
+  </div>
+
+  <div class="result" id="result" aria-live="polite">
+    <h2 id="status"></h2>
+    <div class="drug-name" id="drugName"></div>
+    <p id="drugDetail"></p>
+    <p class="notice" id="notice"></p>
+  </div>
+</section>
+
+<button class="admin-toggle" id="adminToggle">
+  ⚙ 薬剤リストの管理
+</button>
+
+<section class="card admin" id="admin">
+  <h2>薬剤リストの管理</h2>
+  <p class="secondary">
+    薬剤の追加・削除ができます。追加した薬剤は、このブラウザに保存されます。
+  </p>
+
+  <div class="admin-row">
+    <input type="text" id="newGeneric" placeholder="一般名">
+    <input type="text" id="newBrand" placeholder="商品名（任意）">
+    <button class="primary-button" id="addDrug">追加</button>
+  </div>
+
+  <div class="admin-list" id="adminList"></div>
+
+  <button class="delete-button" id="resetDrugs">
+    初期リストに戻す
+  </button>
+</section>
+
+<footer>院内薬剤検索ツール</footer>
+</div>
+
+<script>
+// ======================================
+// 初期薬剤データ
+// [一般名, 商品名]
+// 商品名が未確認の項目は空欄にしています。
+// ======================================
+
+const initialDrugs = [
+  ["アカンプロサート", "レグテクト"],
+  ["アセナピン", "シクレスト"],
+  ["アトモキセチン", "ストラテラ"],
+  ["アミトリプチリン", "トリプタノール"],
+  ["アモキサピン", "アモキサン"],
+  ["アリピプラゾール", "エビリファイ"],
+  ["アルプラゾラム", "ソラナックス / コンスタン"],
+  ["イミプラミン", "トフラニール"],
+  ["エスシタロプラム", "レクサプロ"],
+  ["エスゾピクロン", "ルネスタ"],
+  ["エスタゾラム", "ユーロジン"],
+  ["エチゾラム", "デパス"],
+  ["オキサゾラム", "セレナール"],
+  ["オキシペルチン", ""],
+  ["オランザピン", "ジプレキサ"],
+  ["ガランタミン", "レミニール"],
+  ["カルバマゼピン", "テグレトール"],
+  ["抑肝散", "ヨクカンサン / ツムラ抑肝散"],
+  ["クアゼパム", "ドラール"],
+  ["クエチアピン", "セロクエル / ピプレッソ"],
+  ["クロカプラミン", "クロフェクトン"],
+  ["クロキサゾラム", "セパゾン"],
+  ["クロチアゼパム", "リーゼ"],
+  ["クロミプラミン", "アナフラニール"],
+  ["クロルジアゼポキシド", "コントール"],
+  ["クロルプロマジン", "ウインタミン / コントミン"],
+  ["クロザピン", "クロザリル"],
+  ["グアンファシン", "インチュニブ"],
+  ["シアナミド", "シアナマイド"],
+  ["ジアゼパム", "セルシン / ホリゾン"],
+  ["ジスルフィラム", "ノックビン"],
+  ["スボレキサント", "ベルソムラ"],
+  ["スピペロン", "スピロピタン"],
+  ["スルトプリド", "バルネチール"],
+  ["スルピリド", "ドグマチール"],
+  ["セチプチリン", "テシプール"],
+  ["セルトラリン", "ジェイゾロフト"],
+  ["ゾテピン", "ロドピン"],
+  ["ゾピクロン", "アモバン"],
+  ["ゾルピデム", "マイスリー"],
+  ["タンドスピロン", "セディール"],
+  ["炭酸リチウム", "リーマス"],
+  ["チアプリド", "グラマリール"],
+  ["チミペロン", "トロペロン"],
+  ["デュロキセチン", "サインバルタ"],
+  ["トフィソパム", "グランダキシン"],
+  ["トリアゾラム", "ハルシオン"],
+  ["トリヘキシフェニジル", "アーテン"],
+  ["トリミプラミン", "スルモンチール"],
+  ["トラゾドン", "レスリン / デジレル"],
+  ["ドネペジル", "アリセプト"],
+  ["ドネペジル経皮吸収型製剤", "アリドネパッチ"],
+  ["ナルメフェン", "セリンクロ"],
+  ["ニトラゼパム", "ベンザリン / ネルボン"],
+  ["ネモナプリド", "エミレース"],
+  ["ノルトリプチリン", "ノリトレン"],
+  ["ハロペリドール", "セレネース"],
+  ["バルベナジン", "ジスバル"],
+  ["バルプロ酸ナトリウム", "デパケン / セレニカ"],
+  ["パロキセチン", "パキシル"],
+  ["パリペリドン", "インヴェガ / ゼプリオン"],
+  ["ヒドロキシジン", "アタラックス-P"],
+  ["ビペリデン", "アキネトン / ジスパル"],
+  ["ピパンペロン", "プロピタン"],
+  ["ピモジド", "オーラップ"],
+  ["フェノバルビタール", "フェノバール"],
+  ["フルタゾラム", "コレミナール"],
+  ["フルニトラゼパム", "サイレース"],
+  ["フルボキサミン", "デプロメール / ルボックス"],
+  ["フルラゼパム", "ダルメート"],
+  ["ブレクスピプラゾール", "レキサルティ"],
+  ["ブロチゾラム", "レンドルミン"],
+  ["ブロマゼパム", "レキソタン / セニラン"],
+  ["ブロモクリプチン", "パーロデル"],
+  ["プロクロルペラジン", "ノバミン"],
+  ["ブロナンセリン", "ロナセン"],
+  ["プロペリシアジン", "ニューレプチル"],
+  ["プロメタジン", "ピレチア / ヒベルナ"],
+  ["プラミペキソール", "ビ・シフロール"],
+  ["ペルフェナジン", "ピーゼットシー"],
+  ["ペロスピロン", "ルーラン"],
+  ["ボルチオキセチン", "トリンテリックス"],
+  ["マプロチリン", "ルジオミール"],
+  ["ミアンセリン", "テトラミド"],
+  ["ミルナシプラン", "トレドミン"],
+  ["ミルタザピン", "リフレックス / レメロン"],
+  ["メキサゾラム", "メレックス"],
+  ["メダゼパム", "レスミット"],
+  ["メチルフェニデート徐放錠", "コンサータ"],
+  ["メマンチン", "メマリー"],
+  ["モサプラミン", "クレミン"],
+  ["リバスチグミン", "イクセロンパッチ / リバスタッチパッチ"],
+  ["リスデキサンフェタミン", "ビバンセ"],
+  ["リスペリドン", "リスパダール"],
+  ["リルマザホン", "リスミー"],
+  ["ルラシドン", "ラツーダ"],
+  ["レボメプロマジン", "ヒルナミン / レボトミン"],
+  ["レンボレキサント", "デエビゴ"],
+  ["ロラゼパム", "ワイパックス"],
+  ["ロフラゼプ酸エチル", "メイラックス"],
+  ["ロルメタゼパム", "エバミール / ロラメット"],
+  ["ラメルテオン", "ロゼレム"],
+  ["ラモトリギン", "ラミクタール"],
+  ["ベンラファキシン", "イフェクサー"]
+];
+
+// 問い合わせが多いリスト外薬剤。
+// 予測候補には表示しますが、処方可能薬には含めません。
+const frequentOutside = [
+  { generic: "イリボー", brand: "イリボー" },
+  { generic: "ロキソニン", brand: "ロキソニン" }
+];
+
+const STORAGE_KEY = "clinicDrugList_v2";
+
+function cloneInitialDrugs() {
+  return initialDrugs.map(item => [...item]);
+}
+
+function loadDrugs() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return cloneInitialDrugs();
+
+    const parsed = JSON.parse(saved);
+    if (!Array.isArray(parsed)) return cloneInitialDrugs();
+
+    return parsed.filter(item =>
+      Array.isArray(item) &&
+      typeof item[0] === "string" &&
+      typeof item[1] === "string"
+    );
+  } catch {
+    return cloneInitialDrugs();
+  }
+}
+
+let drugs = loadDrugs();
+
+function saveDrugs() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(drugs));
+}
+
+function normalize(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[\s　・\-－ー/／]/g, "");
+}
+
+function getAllItems() {
+  const registered = drugs.map(([generic, brand]) => ({
+    generic,
+    brand: brand || "",
+    available: true
+  }));
+
+  const outside = frequentOutside.map(item => ({
+    ...item,
+    available: false
+  }));
+
+  return [...registered, ...outside];
+}
+
+function findMatches(query) {
+  const q = normalize(query);
+  if (!q) return [];
+
+  return getAllItems().filter(item => {
+    const names = [item.generic, ...item.brand.split(/[\/／]/)];
+    return names.some(name => normalize(name).includes(q));
+  });
+}
+
+function escapeHTML(value) {
+  return String(value).replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[char]);
+}
+
+const search = document.getElementById("search");
+const suggestions = document.getElementById("suggestions");
+const result = document.getElementById("result");
+const status = document.getElementById("status");
+const drugName = document.getElementById("drugName");
+const drugDetail = document.getElementById("drugDetail");
+const notice = document.getElementById("notice");
+
+function showSuggestions(matches) {
+  suggestions.innerHTML = "";
+
+  if (!matches.length) {
+    suggestions.style.display = "none";
+    return;
+  }
+
+  matches.slice(0, 10).forEach(item => {
+    const div = document.createElement("div");
+    div.className = "suggestion";
+    div.tabIndex = 0;
+
+    const generic = document.createElement("strong");
+    generic.textContent = item.generic;
+
+    const small = document.createElement("small");
+    small.textContent = item.brand || "商品名登録なし";
+
+    div.appendChild(generic);
+    div.appendChild(small);
+
+    div.addEventListener("click", () => selectDrug(item));
+    div.addEventListener("keydown", event => {
+      if (event.key === "Enter") selectDrug(item);
+    });
+
+    suggestions.appendChild(div);
+  });
+
+  suggestions.style.display = "block";
+}
+
+function selectDrug(item) {
+  search.value = item.generic;
+  suggestions.style.display = "none";
+  displayResult(item);
+}
+
+function displayResult(item) {
+  result.style.display = "block";
+  drugName.textContent = item.generic;
+  drugDetail.textContent = item.brand
+    ? "商品名：" + item.brand
+    : "商品名の登録はありません。";
+
+  if (item.available) {
+    result.className = "result available";
+    status.textContent = "当院処方可能です";
+    notice.textContent = "";
+  } else {
+    result.className = "result unavailable";
+    status.textContent = "当院処方が原則不可な薬です";
+    notice.textContent =
+      "処方が必要と判断した場合は、カルテ内にその理由を記載してください。";
+  }
+}
+
+function displayUnknown(query) {
+  result.style.display = "block";
+  result.className = "result unavailable";
+  status.textContent = "当院処方が原則不可な薬です";
+  drugName.textContent = query;
+  drugDetail.textContent = "登録されていない薬剤です。";
+  notice.textContent =
+    "処方が必要と判断した場合は、カルテ内にその理由を記載してください。";
+}
+
+search.addEventListener("input", () => {
+  const query = search.value.trim();
+
+  if (!query) {
+    suggestions.style.display = "none";
+    result.style.display = "none";
+    return;
+  }
+
+  const matches = findMatches(query);
+  showSuggestions(matches);
+
+  const exactMatch = matches.find(item =>
+    normalize(item.generic) === normalize(query) ||
+    item.brand.split(/[\/／]/).some(name =>
+      normalize(name) === normalize(query)
+    )
+  );
+
+  if (exactMatch) {
+    displayResult(exactMatch);
+  } else {
+    result.style.display = "none";
+  }
+});
+
+search.addEventListener("keydown", event => {
+  if (event.key === "Escape") {
+    suggestions.style.display = "none";
+  }
+
+  if (event.key === "Enter") {
+    const query = search.value.trim();
+    if (!query) return;
+
+    const matches = findMatches(query);
+
+    if (matches.length) {
+      selectDrug(matches[0]);
+    } else {
+      suggestions.style.display = "none";
+      displayUnknown(query);
+    }
+  }
+});
+
+document.addEventListener("click", event => {
+  if (!event.target.closest(".search-wrap")) {
+    suggestions.style.display = "none";
+  }
+});
+
+// ======================================
+// 薬剤リスト管理
+// ======================================
+
+const admin = document.getElementById("admin");
+const adminToggle = document.getElementById("adminToggle");
+
+adminToggle.addEventListener("click", () => {
+  const isOpen = admin.style.display === "block";
+  admin.style.display = isOpen ? "none" : "block";
+
+  if (!isOpen) renderAdminList();
+});
+
+document.getElementById("addDrug").addEventListener("click", () => {
+  const generic = document.getElementById("newGeneric").value.trim();
+  const brand = document.getElementById("newBrand").value.trim();
+
+  if (!generic) {
+    alert("一般名を入力してください。");
+    return;
+  }
+
+  const exists = drugs.some(([name]) =>
+    normalize(name) === normalize(generic)
+  );
+
+  if (exists) {
+    alert("この薬剤はすでに登録されています。");
+    return;
+  }
+
+  drugs.push([generic, brand]);
+  saveDrugs();
+
+  document.getElementById("newGeneric").value = "";
+  document.getElementById("newBrand").value = "";
+
+  renderAdminList();
+});
+
+function renderAdminList() {
+  const list = document.getElementById("adminList");
+  list.innerHTML = "";
+
+  drugs.forEach(([generic, brand], index) => {
+    const row = document.createElement("div");
+    row.className = "admin-item";
+
+    const name = document.createElement("span");
+    name.textContent = generic + (brand ? " / " + brand : "");
+
+    const button = document.createElement("button");
+    button.className = "delete-button";
+    button.textContent = "削除";
+
+    button.addEventListener("click", () => {
+      if (confirm(generic + " を削除しますか？")) {
+        drugs.splice(index, 1);
+        saveDrugs();
+        renderAdminList();
+      }
+    });
+
+    row.appendChild(name);
+    row.appendChild(button);
+    list.appendChild(row);
+  });
+}
+
+document.getElementById("resetDrugs").addEventListener("click", () => {
+  if (confirm("初期リストに戻しますか？追加・削除した内容は失われます。")) {
+    drugs = cloneInitialDrugs();
+    saveDrugs();
+    renderAdminList();
+  }
+});
+</script>
+</body>
+</html>

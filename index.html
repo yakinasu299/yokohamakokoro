@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>横浜こころとねむりのクリニック｜院内薬剤検索</title>
+<title>横浜こころとねむりのクリニック｜当院処方〇×検索</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
 
@@ -119,7 +119,7 @@ button,input{font:inherit}
   <header class="header">
     <div class="header-copy">
       <p class="header-label">CLINIC MEDICATION GUIDE</p>
-      <h1>院内薬剤検索</h1>
+      <h1>当院処方〇×検索</h1>
       <p class="description">薬剤名を入力して、院内での<br>処方可否を確認できます。</p>
     </div>
     <div class="illustration" aria-hidden="true">
@@ -152,7 +152,7 @@ button,input{font:inherit}
 
   <footer class="footer">
     <span>横浜こころとねむりのクリニック</span>
-    <span>院内薬剤検索ツール</span>
+    <span>当院処方〇×検索ツール</span>
   </footer>
 
   <p class="disclaimer">
@@ -370,6 +370,7 @@ const ADDITIONAL_TEXT = `
 スボレキサント|ベルソムラ
 レンボレキサント|デエビゴ
 ダリドレキサント|クービビック
+ボルノレキサント|ボルズィ
 フェノバルビタール|フェノバール
 アモバルビタール|
 セコバルビタール|
@@ -681,25 +682,31 @@ const ADDITIONAL_TEXT = `
 `;
 
 /*
- * 今回追加する処方可能薬。
- * プラチナマニュアル掲載の処方可能薬とは区別して管理します。
+ * プラチナマニュアル未掲載だが、慣習として処方可能な薬剤。
+ * name は一般名、brand は院内で登録する商品名・表示名、
+ * aliases は商品名の表記ゆれや追加の検索名です。
  */
 const CUSTOM_APPROVED_DRUGS = [
-  ["半夏厚朴湯", "ツムラ半夏厚朴湯"],
-  ["加味帰脾湯", "ツムラ加味帰脾湯"],
-  ["抑肝散", "ツムラ抑肝散"],
-  ["半夏厚朴湯", "クラシエ半夏厚朴湯"],
-  ["抑肝散加陳皮半夏", "ツムラ抑肝散加陳皮半夏"],
-  ["補中益気湯", "ツムラ補中益気湯"],
-  ["加味逍遙散", "ツムラ加味逍遙散"],
-  ["五苓散", "ツムラ五苓散"],
-  ["苓桂朮甘湯", "ツムラ苓桂朮甘湯"],
-  ["柴胡加竜骨牡蛎湯", "ツムラ柴胡加竜骨牡蛎湯"],
-  ["メトクロプラミド", "プリンペラン"],
-  ["ダリドレキサント", "クービビック"],
-  ["ボルズィ", "ボルズィ"],
-  ["ドンペリドン", "ドンペリドン"]
-];
+  { name: "半夏厚朴湯", brand: "ツムラ半夏厚朴湯", aliases: ["ツムラ半夏厚朴湯"] },
+  { name: "加味帰脾湯", brand: "ツムラ加味帰脾湯", aliases: ["ツムラ加味帰脾湯"] },
+  { name: "抑肝散", brand: "ツムラ抑肝散", aliases: ["ツムラ抑肝散"] },
+  { name: "半夏厚朴湯", brand: "クラシエ半夏厚朴湯", aliases: ["クラシエ半夏厚朴湯"] },
+  { name: "抑肝散加陳皮半夏", brand: "ツムラ抑肝散加陳皮半夏", aliases: ["ツムラ抑肝散加陳皮半夏"] },
+  { name: "補中益気湯", brand: "ツムラ補中益気湯", aliases: ["ツムラ補中益気湯"] },
+  { name: "加味逍遙散", brand: "ツムラ加味逍遙散", aliases: ["ツムラ加味逍遙散"] },
+  { name: "五苓散", brand: "ツムラ五苓散", aliases: ["ツムラ五苓散"] },
+  { name: "苓桂朮甘湯", brand: "ツムラ苓桂朮甘湯", aliases: ["ツムラ苓桂朮甘湯"] },
+  { name: "柴胡加竜骨牡蛎湯", brand: "ツムラ柴胡加竜骨牡蛎湯", aliases: ["ツムラ柴胡加竜骨牡蛎湯"] },
+  { name: "メトクロプラミド", brand: "プリンペラン", aliases: ["プリンペラン"] },
+  { name: "ダリドレキサント", brand: "クービビック", aliases: ["クービビック"] },
+  { name: "ボルノレキサント", brand: "ボルズィ", aliases: ["ボルズィ"] },
+  { name: "ドンペリドン", brand: "ドンペリドン", aliases: ["ドンペリドン"] }
+].map(drug => ({
+  ...drug,
+  aliases: [...new Set([drug.brand, ...(drug.aliases || [])])],
+  approved: true,
+  customApproved: true
+}));
 
 /* 表記ゆれを吸収する */
 const normalize = value => String(value || "")
@@ -745,18 +752,22 @@ ADDITIONAL_TEXT.trim().split("\n").forEach(line => {
 });
 
 /* 今回追加した薬剤を検索データに登録 */
-CUSTOM_APPROVED_DRUGS.forEach(([generic, brand]) => {
-  mergeDrug(drugs, generic, brand, false);
+CUSTOM_APPROVED_DRUGS.forEach(customDrug => {
+  mergeDrug(drugs, customDrug.name, customDrug.brand, false);
+  customDrug.aliases.forEach(alias => {
+    mergeDrug(drugs, customDrug.name, alias, false);
+  });
 });
 
 /*
- * 今回追加した薬剤の商品名・製品名。
- * この名称に一致した場合だけ、慣習処方可能として表示します。
+ * 慣習処方可能薬の検索名。
+ * 一般名・商品名・別名のいずれで検索しても慣習処方可能と判定します。
  */
 const CUSTOM_APPROVED_NAMES = new Set(
-  CUSTOM_APPROVED_DRUGS.flatMap(([generic, brand]) => [
-    normalize(generic),
-    normalize(brand)
+  CUSTOM_APPROVED_DRUGS.flatMap(drug => [
+    normalize(drug.name),
+    normalize(drug.brand),
+    ...drug.aliases.map(normalize)
   ])
 );
 

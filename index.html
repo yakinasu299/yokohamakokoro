@@ -87,6 +87,19 @@ button,input{font:inherit}
 .drug-brands{color:#788c83;font-size:13px;line-height:1.8}
 .warning{margin-top:16px;padding:13px 16px;border-left:3px solid #e0ad69;border-radius:6px;background:#fff4e6;color:#805e35;font-size:12px;line-height:1.8}
 .restricted .warning{border-color:#d98d87;background:#fff0ef;color:#914d49}
+
+/* 慣習として処方可能な薬剤の注記 */
+.custom-approved-note{
+  margin-top:12px;
+  padding:12px 15px;
+  border-left:3px solid var(--green);
+  border-radius:7px;
+  background:#f0f7f5;
+  color:#47766b;
+  font-size:12px;
+  line-height:1.8;
+}
+
 .footer{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:18px 5px;color:#a0aea8;font-size:10px}
 .disclaimer{margin:18px 5px;color:#a0aea8;font-size:10px;line-height:1.7}
 @media(max-width:600px){
@@ -667,6 +680,27 @@ const ADDITIONAL_TEXT = `
 レパグリニド|シュアポスト
 `;
 
+/*
+ * 今回追加する処方可能薬。
+ * プラチナマニュアル掲載の処方可能薬とは区別して管理します。
+ */
+const CUSTOM_APPROVED_DRUGS = [
+  ["半夏厚朴湯", "ツムラ半夏厚朴湯"],
+  ["加味帰脾湯", "ツムラ加味帰脾湯"],
+  ["抑肝散", "ツムラ抑肝散"],
+  ["半夏厚朴湯", "クラシエ半夏厚朴湯"],
+  ["抑肝散加陳皮半夏", "ツムラ抑肝散加陳皮半夏"],
+  ["補中益気湯", "ツムラ補中益気湯"],
+  ["加味逍遙散", "ツムラ加味逍遙散"],
+  ["五苓散", "ツムラ五苓散"],
+  ["苓桂朮甘湯", "ツムラ苓桂朮甘湯"],
+  ["柴胡加竜骨牡蛎湯", "ツムラ柴胡加竜骨牡蛎湯"],
+  ["メトクロプラミド", "プリンペラン"],
+  ["ダリドレキサント", "クービビック"],
+  ["ボルズィ", "ボルズィ"],
+  ["ドンペリドン", "ドンペリドン"]
+];
+
 /* 表記ゆれを吸収する */
 const normalize = value => String(value || "")
   .toLowerCase()
@@ -710,6 +744,22 @@ ADDITIONAL_TEXT.trim().split("\n").forEach(line => {
   mergeDrug(drugs, generic.trim(), brands.trim(), false);
 });
 
+/* 今回追加した薬剤を検索データに登録 */
+CUSTOM_APPROVED_DRUGS.forEach(([generic, brand]) => {
+  mergeDrug(drugs, generic, brand, false);
+});
+
+/*
+ * 今回追加した薬剤の商品名・製品名。
+ * この名称に一致した場合だけ、慣習処方可能として表示します。
+ */
+const CUSTOM_APPROVED_NAMES = new Set(
+  CUSTOM_APPROVED_DRUGS.flatMap(([generic, brand]) => [
+    normalize(generic),
+    normalize(brand)
+  ])
+);
+
 /*
  * 施設固有の処方制限。
  * 商品名単位で判定し、同じ一般名の別製剤まで一律に制限しない。
@@ -737,6 +787,7 @@ function escapeHTML(value) {
 function getDrugStatus(drug, matchedName) {
   const matched = normalize(matchedName);
 
+  /* 施設固有の処方制限を最優先 */
   if (RESTRICTED_BRANDS.has(matched)) return "restricted";
 
   /*
@@ -747,6 +798,9 @@ function getDrugStatus(drug, matchedName) {
     normalize(drug.generic) === normalize("メチルフェニデート徐放錠") &&
     matched === normalize("メチルフェニデート徐放錠")
   ) return "restricted";
+
+  /* 今回追加した薬剤は慣習処方可能として扱う */
+  if (CUSTOM_APPROVED_NAMES.has(matched)) return "custom-approved";
 
   if (drug.approved) return "available";
 
@@ -822,6 +876,18 @@ function renderResult(entry) {
     return;
   }
 
+  if (entry.status === "custom-approved") {
+    resultBox.className = "result-card available";
+    resultBox.innerHTML = `
+      <span class="status">✓ 当院処方可能です</span>
+      <div class="drug-name">${escapeHTML(entry.generic)}</div>
+      <div class="drug-brands">${brands}</div>
+      <div class="custom-approved-note">
+        プラチナマニュアルには掲載がありませんが、慣習として処方可能です
+      </div>`;
+    return;
+  }
+
   if (entry.status === "available") {
     resultBox.className = "result-card available";
     resultBox.innerHTML = `
@@ -877,6 +943,8 @@ function searchSuggestions(query) {
 
     if (entry.status === "restricted") {
       statusText = "当院では処方できません";
+    } else if (entry.status === "custom-approved") {
+      statusText = "慣習として処方可能";
     } else if (entry.status === "available") {
       statusText = "当院処方可能リストに登録";
     } else {

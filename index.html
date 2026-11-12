@@ -90,8 +90,6 @@ button,input{font:inherit}
 .warning{margin-top:16px;padding:13px 16px;border-left:3px solid #e0ad69;border-radius:6px;background:#fff4e6;color:#805e35;font-size:12px;line-height:1.8}
 .restricted .warning{border-color:#d98d87;background:#fff0ef;color:#914d49}
 .conditional .warning{border-color:#d9b66f;background:#fff7e5;color:#80632e}
-
-/* 慣習として処方可能な薬剤の注記 */
 .custom-approved-note{
   margin-top:12px;
   padding:12px 15px;
@@ -102,7 +100,6 @@ button,input{font:inherit}
   font-size:12px;
   line-height:1.8;
 }
-
 .footer{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:18px 5px;color:#a0aea8;font-size:10px}
 .disclaimer{margin:18px 5px;color:#a0aea8;font-size:10px;line-height:1.7}
 @media(max-width:600px){
@@ -144,7 +141,7 @@ button,input{font:inherit}
       <span class="search-icon">⌕</span>
       <ul id="suggestions" class="suggestions" hidden></ul>
     </div>
-    <p class="hint">一般名・商品名のどちらからでも検索できます。</p>
+    <p class="hint">一般名・商品名のどちらからでも検索できます。ひらがな・カタカナのどちらで入力しても検索できます。</p>
   </section>
 
   <section id="result" class="result-card" aria-live="polite">
@@ -277,9 +274,9 @@ const APPROVED = [
 ];
 
 /*
- * 追加検索候補400件。
- * 265番は薬剤名ではなく説明文のため、候補には登録していません。
- * 同じ薬剤が複数回登場する場合は検索時に統合します。
+ * 追加検索候補。
+ * 一般名を検索の基準とし、商品名が確認できるものだけ商品名を登録します。
+ * ここに登録した薬剤は、院内処方可能リストには追加されません。
  */
 const ADDITIONAL_TEXT = `
 クロルプロマジン|コントミン
@@ -682,13 +679,27 @@ const ADDITIONAL_TEXT = `
 ミグリトール|セイブル
 ナテグリニド|ファスティック
 レパグリニド|シュアポスト
+
+/* 今回追加する候補。商品名が未確認のものは一般名のみで登録 */
+クエン酸第一鉄ナトリウム|フェロミア
+含糖酸化鉄|フェジン
+カルボキシマルトース第二鉄|フェインジェクト
+酢酸亜鉛水和物|ノベルジン
+ヒスチジン亜鉛水和物|ジンタス
+ガバペンチンエナカルビル|レグナイト
+ソフピロニウム臭化物|エクロック
+グリコピロニウムトシル酸塩水和物|ラピフォート
+オキシブチニン塩酸塩|アポハイド
+プロパンテリン臭化物|プロ・バンサイン
+ドロキシドパ|ドプス
+レボカルニチン|エルカルチン
 `;
 
-/*
- * プラチナマニュアル未掲載だが、慣習として処方可能な薬剤。
- * name は一般名、brand は院内で登録する商品名・表示名、
- * aliases は商品名の表記ゆれや追加の検索名です。
- */
+ /*
+  * プラチナマニュアル未掲載だが、慣習として処方可能な薬剤。
+  * name は一般名、brand は院内で登録する商品名・表示名、
+  * aliases は商品名の表記ゆれや追加の検索名です。
+  */
 const CUSTOM_APPROVED_DRUGS = [
   { name: "半夏厚朴湯", brand: "ツムラ半夏厚朴湯", aliases: ["ツムラ半夏厚朴湯"] },
   { name: "加味帰脾湯", brand: "ツムラ加味帰脾湯", aliases: ["ツムラ加味帰脾湯"] },
@@ -713,7 +724,11 @@ const CUSTOM_APPROVED_DRUGS = [
 
 /* 表記ゆれを吸収する */
 const normalize = value => String(value || "")
+  .normalize("NFKC")
   .toLowerCase()
+  .replace(/[\u3041-\u3096]/g, char =>
+    String.fromCharCode(char.charCodeAt(0) + 0x60)
+  )
   .replace(/[ 　・‐‑‒–—-]/g, "")
   .replace(/[（）()]/g, "")
   .trim();
@@ -747,14 +762,14 @@ APPROVED.forEach(([generic, brands]) => {
   mergeDrug(drugs, generic, brands, true);
 });
 
-/* 追加400件を検索候補として登録 */
+/* 追加候補を検索候補として登録 */
 ADDITIONAL_TEXT.trim().split("\n").forEach(line => {
   const [generic, brands = ""] = line.split("|");
   if (!generic || !generic.trim()) return;
   mergeDrug(drugs, generic.trim(), brands.trim(), false);
 });
 
-/* 今回追加した薬剤を検索データに登録 */
+/* 慣習処方可能薬を検索データに登録 */
 CUSTOM_APPROVED_DRUGS.forEach(customDrug => {
   mergeDrug(drugs, customDrug.name, customDrug.brand, false);
   customDrug.aliases.forEach(alias => {
@@ -801,26 +816,19 @@ function escapeHTML(value) {
 function getDrugStatus(drug, matchedName) {
   const matched = normalize(matchedName);
 
-  /* エビリファイ（アリピプラゾール）は初診での新規処方を行わない条件付き処方 */
   if (
     normalize(drug.generic) === normalize("アリピプラゾール") ||
     matched === normalize("エビリファイ") ||
     matched === normalize("アリピプラゾール")
   ) return "conditional";
 
-  /* 施設固有の処方制限を最優先 */
   if (RESTRICTED_BRANDS.has(matched)) return "restricted";
 
-  /*
-   * コンサータは徐放錠として院内リストに登録されているが、
-   * 施設固有の制限を優先する。
-   */
   if (
     normalize(drug.generic) === normalize("メチルフェニデート徐放錠") &&
     matched === normalize("メチルフェニデート徐放錠")
   ) return "restricted";
 
-  /* 今回追加した薬剤は慣習処方可能として扱う */
   if (CUSTOM_APPROVED_NAMES.has(matched)) return "custom-approved";
 
   if (drug.approved) return "available";
@@ -858,7 +866,6 @@ function findExact(query) {
   const q = normalize(query);
   if (!q) return null;
 
-  /* 商品名の完全一致を一般名より優先 */
   const brandMatch = entries.find(entry =>
     entry.name !== entry.generic &&
     normalize(entry.name) === q
@@ -960,7 +967,6 @@ function searchSuggestions(query) {
       return aExact - bExact;
     });
 
-  /* 同じ表示名は重複させない */
   const unique = [];
   const seen = new Set();
 

@@ -6,15 +6,9 @@
 <title>横浜こころとねむりのクリニック｜当院処方〇×検索</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
-
 :root {
-  --green:#72ad96;
-  --green-dark:#4f9279;
-  --green-light:#eaf5ef;
-  --blue:#8bbbd0;
-  --ink:#344b48;
-  --muted:#82938e;
-  --line:#e3ede8;
+  --green:#72ad96; --green-dark:#4f9279; --green-light:#eaf5ef;
+  --blue:#8bbbd0; --ink:#344b48; --muted:#82938e; --line:#e3ede8;
 }
 *{box-sizing:border-box}
 body{
@@ -91,14 +85,8 @@ button,input{font:inherit}
 .restricted .warning{border-color:#d98d87;background:#fff0ef;color:#914d49}
 .conditional .warning{border-color:#d9b66f;background:#fff7e5;color:#80632e}
 .custom-approved-note{
-  margin-top:12px;
-  padding:12px 15px;
-  border-left:3px solid var(--green);
-  border-radius:7px;
-  background:#f0f7f5;
-  color:#47766b;
-  font-size:12px;
-  line-height:1.8;
+  margin-top:12px;padding:12px 15px;border-left:3px solid var(--green);
+  border-radius:7px;background:#f0f7f5;color:#47766b;font-size:12px;line-height:1.8
 }
 .footer{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:18px 5px;color:#a0aea8;font-size:10px}
 .disclaimer{margin:18px 5px;color:#a0aea8;font-size:10px;line-height:1.7}
@@ -275,8 +263,9 @@ const APPROVED = [
 
 /*
  * 追加検索候補。
- * 一般名を検索の基準とし、商品名が確認できるものだけ商品名を登録します。
- * ここに登録した薬剤は、院内処方可能リストには追加されません。
+ * ここに登録した薬剤は院内処方可能リストには追加されず、
+ * 原則として「当院処方が原則不可な薬です」と表示されます。
+ * 商品名が確認できない薬剤は一般名のみで登録します。
  */
 const ADDITIONAL_TEXT = `
 クロルプロマジン|コントミン
@@ -680,26 +669,29 @@ const ADDITIONAL_TEXT = `
 ナテグリニド|ファスティック
 レパグリニド|シュアポスト
 
-/* 今回追加する候補。商品名が未確認のものは一般名のみで登録 */
+/* 今回追加：商品名と一般名の両方を検索できる原則処方不可候補 */
+d-クロルフェニラミンマレイン酸塩|ポララミン
+
+/* 商品名を確認できた追加候補 */
+酢酸亜鉛水和物|ノベルジン
+ヒスチジン亜鉛水和物|ジンタス
+オキシブチニン塩酸塩|アポハイドローション
+ソフピロニウム臭化物|エクロックゲル
+グリコピロニウムトシル酸塩水和物|ラピフォートワイプ
+プロパンテリン臭化物|プロ・バンサイン
+ガバペンチンエナカルビル|レグナイト
 クエン酸第一鉄ナトリウム|フェロミア
 含糖酸化鉄|フェジン
 カルボキシマルトース第二鉄|フェインジェクト
-酢酸亜鉛水和物|ノベルジン
-ヒスチジン亜鉛水和物|ジンタス
-ガバペンチンエナカルビル|レグナイト
-ソフピロニウム臭化物|エクロック
-グリコピロニウムトシル酸塩水和物|ラピフォート
-オキシブチニン塩酸塩|アポハイド
-プロパンテリン臭化物|プロ・バンサイン
-ドロキシドパ|ドプス
 レボカルニチン|エルカルチン
+ドロキシドパ|ドプス
 `;
 
- /*
-  * プラチナマニュアル未掲載だが、慣習として処方可能な薬剤。
-  * name は一般名、brand は院内で登録する商品名・表示名、
-  * aliases は商品名の表記ゆれや追加の検索名です。
-  */
+/*
+ * プラチナマニュアル未掲載だが、慣習として処方可能な薬剤。
+ * name は一般名、brand は院内で登録する商品名・表示名、
+ * aliases は商品名の表記ゆれや追加の検索名です。
+ */
 const CUSTOM_APPROVED_DRUGS = [
   { name: "半夏厚朴湯", brand: "ツムラ半夏厚朴湯", aliases: ["ツムラ半夏厚朴湯"] },
   { name: "加味帰脾湯", brand: "ツムラ加味帰脾湯", aliases: ["ツムラ加味帰脾湯"] },
@@ -762,14 +754,14 @@ APPROVED.forEach(([generic, brands]) => {
   mergeDrug(drugs, generic, brands, true);
 });
 
-/* 追加候補を検索候補として登録 */
+/* 追加検索候補を登録。処方可能フラグは付与しない */
 ADDITIONAL_TEXT.trim().split("\n").forEach(line => {
   const [generic, brands = ""] = line.split("|");
   if (!generic || !generic.trim()) return;
   mergeDrug(drugs, generic.trim(), brands.trim(), false);
 });
 
-/* 慣習処方可能薬を検索データに登録 */
+/* 今回追加した薬剤を検索データに登録 */
 CUSTOM_APPROVED_DRUGS.forEach(customDrug => {
   mergeDrug(drugs, customDrug.name, customDrug.brand, false);
   customDrug.aliases.forEach(alias => {
@@ -816,19 +808,26 @@ function escapeHTML(value) {
 function getDrugStatus(drug, matchedName) {
   const matched = normalize(matchedName);
 
+  /* エビリファイ（アリピプラゾール）は初診での新規処方を行わない条件付き処方 */
   if (
     normalize(drug.generic) === normalize("アリピプラゾール") ||
     matched === normalize("エビリファイ") ||
     matched === normalize("アリピプラゾール")
   ) return "conditional";
 
+  /* 施設固有の処方制限を最優先 */
   if (RESTRICTED_BRANDS.has(matched)) return "restricted";
 
+  /*
+   * コンサータは徐放錠として院内リストに登録されているが、
+   * 施設固有の制限を優先する。
+   */
   if (
     normalize(drug.generic) === normalize("メチルフェニデート徐放錠") &&
     matched === normalize("メチルフェニデート徐放錠")
   ) return "restricted";
 
+  /* 今回追加した薬剤は慣習処方可能として扱う */
   if (CUSTOM_APPROVED_NAMES.has(matched)) return "custom-approved";
 
   if (drug.approved) return "available";
@@ -866,6 +865,7 @@ function findExact(query) {
   const q = normalize(query);
   if (!q) return null;
 
+  /* 商品名の完全一致を一般名より優先 */
   const brandMatch = entries.find(entry =>
     entry.name !== entry.generic &&
     normalize(entry.name) === q
@@ -967,6 +967,7 @@ function searchSuggestions(query) {
       return aExact - bExact;
     });
 
+  /* 同じ表示名は重複させない */
   const unique = [];
   const seen = new Set();
 
